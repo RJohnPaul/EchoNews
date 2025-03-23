@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // Added for authentication
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -46,7 +47,8 @@ import {
   RefreshCw,
   ExternalLink,
   Star,
-  Filter
+  Filter,
+  LogOut // Added logout icon
 } from "lucide-react";
 import { 
   Sheet, 
@@ -313,6 +315,7 @@ function Pagination({
 }
 
 export default function NewsQueryPage() {
+  const router = useRouter(); // Add router for authentication navigation
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [message, setMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -324,6 +327,20 @@ export default function NewsQueryPage() {
   const [totalPages, setTotalPages] = useState<number>(0);
   const [pageSize] = useState<number>(10);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState<boolean>(true);
+  
+  // Check if user is logged in
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    if (!isLoggedIn) {
+      router.push('/login');
+    }
+  }, [router]);
+
+  // Logout function
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    router.push('/login');
+  };
   
   // Initialize form with react-hook-form and zod validation
   const form = useForm<z.infer<typeof formSchema>>({
@@ -453,6 +470,19 @@ export default function NewsQueryPage() {
       {/* Hero section */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-12 px-4">
         <div className="container mx-auto max-w-5xl">
+          {/* Add logout button */}
+          <div className="flex justify-end mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="hover:text-black border-white/30 bg-white/10"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+          
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-center">
             Multilingual News Search
           </h1>
