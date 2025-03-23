@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation"; // Added for authentication
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -48,7 +49,8 @@ import {
   ExternalLink,
   Star,
   Filter,
-  LogOut // Added logout icon
+  LogOut,
+  AlertTriangle
 } from "lucide-react";
 import { 
   Sheet, 
@@ -64,6 +66,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 // Define form schema with Zod
 const formSchema = z.object({
@@ -128,6 +131,30 @@ function getRelativeTime(dateString: string) {
   } catch (e) {
     return "unknown date";
   }
+}
+
+// Server warm-up warning component
+function ServerWarmupWarning({ isVisible, onRetry }: { isVisible: boolean, onRetry: () => void }) {
+  if (!isVisible) return null;
+  
+  return (
+    <Alert className="mb-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
+      <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+      <AlertTitle className="text-yellow-800 dark:text-yellow-400">Server Warming Up</AlertTitle>
+      <AlertDescription className="text-yellow-700 dark:text-yellow-300 flex flex-col space-y-3">
+        <p>Our backend server is starting up after a period of inactivity. This may take up to 30 seconds.</p>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={onRetry}
+          className="w-fit text-yellow-700 border-yellow-300 hover:bg-yellow-100 dark:text-yellow-400 dark:border-yellow-800 dark:hover:bg-yellow-900/30"
+        >
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Try Again
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
 }
 
 // Relevance indicator component
@@ -320,6 +347,7 @@ export default function NewsQueryPage() {
   const [message, setMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isServerWarming, setIsServerWarming] = useState<boolean>(false);
   const [availableSources, setAvailableSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [totalFound, setTotalFound] = useState<number>(0);
@@ -328,17 +356,49 @@ export default function NewsQueryPage() {
   const [pageSize] = useState<number>(10);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState<boolean>(true);
   
+  // Server wake-up ping on initial load
+  useEffect(() => {
+    const pingServer = async () => {
+      try {
+        // Send a lightweight request to wake up the server
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com"}/api/health`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        console.log("Backend server ping successful");
+      } catch (err) {
+        console.log("Backend server ping failed, may need warm-up time");
+      }
+    };
+    
+    pingServer();
+    
+    // Set up periodic ping to keep server warm (every 14 minutes)
+    const pingInterval = setInterval(pingServer, 14 * 60 * 1000);
+    
+    return () => clearInterval(pingInterval);
+  }, []);
+  
   // Check if user is logged in
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('isLoggedIn');
     if (!isLoggedIn) {
       router.push('/login');
+    } else {
+      // Also set a cookie for middleware authentication
+      document.cookie = `isLoggedIn=true; path=/; max-age=86400`; // 24 hours
     }
   }, [router]);
 
   // Logout function
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('loginTime');
+    
+    // Clear the cookie as well
+    document.cookie = 'isLoggedIn=; path=/; max-age=0';
+    
     router.push('/login');
   };
   
@@ -359,7 +419,13 @@ export default function NewsQueryPage() {
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const response = await fetch(`/api/news/sources/${selectedLanguage}`);
+        const response = await fetchWithRetry(`/api/news/sources/${selectedLanguage}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }, 2);
+        
         if (response.ok) {
           const data = await response.json();
           const sourceNames = data.sources.map((s: any) => s.name);
@@ -368,11 +434,23 @@ export default function NewsQueryPage() {
           // Reset selected sources when language changes
           setSelectedSources([]);
           form.setValue("preferred_sources", []);
+          
+          // Server responded successfully, so it's not warming up
+          setIsServerWarming(false);
+        } else if (response.status === 504) {
+          // Server is probably warming up
+          setIsServerWarming(true);
+          console.warn("Server timeout when fetching sources, may be warming up");
         } else {
-          console.error("Failed to fetch sources");
+          console.error("Failed to fetch sources:", response.status);
         }
       } catch (err) {
         console.error("Error fetching sources:", err);
+        // Check if it's likely a timeout issue
+        if (err instanceof Error && 
+            (err.message.includes("timeout") || err.message.includes("network") || err.name === "AbortError")) {
+          setIsServerWarming(true);
+        }
       }
     };
 
@@ -401,13 +479,14 @@ export default function NewsQueryPage() {
     }
   };
 
-  // Fetch news from API
+  // Fetch news from API with retry mechanism
   const fetchNews = async (values: z.infer<typeof formSchema>, page = 1) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch("/api/news", {
+      // Use fetchWithRetry to handle timeouts and retries
+      const response = await fetchWithRetry("/api/news", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -419,13 +498,23 @@ export default function NewsQueryPage() {
           page_size: pageSize,
           preferred_sources: values.preferred_sources || [],
         }),
-      });
+      }, 3); // Try up to 3 times with backoff
+
+      if (response.status === 504) {
+        setIsServerWarming(true);
+        setError("The server is taking longer than expected to respond. It might be starting up after inactivity.");
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
       }
 
       const data: NewsResponse = await response.json();
+      
+      // Server responded successfully, so it's not warming up anymore
+      setIsServerWarming(false);
       
       // Update state with API response
       setArticles(data.articles);
@@ -438,7 +527,17 @@ export default function NewsQueryPage() {
         setAvailableSources(data.available_sources);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
+      console.error("Error fetching news:", err);
+      
+      // Check if it's likely a timeout issue
+      if (err instanceof Error && 
+          (err.message.includes("timeout") || err.message.includes("network") || err.name === "AbortError")) {
+        setIsServerWarming(true);
+        setError("Connection to the server timed out. The server might be starting up after inactivity.");
+      } else {
+        setError(err instanceof Error ? err.message : "An unknown error occurred");
+      }
+      
       setArticles([]);
     } finally {
       setLoading(false);
@@ -455,6 +554,12 @@ export default function NewsQueryPage() {
     
     await fetchNews(values, 1);
   }
+
+  // Retry handler for server warming up state
+  const handleRetry = () => {
+    const values = form.getValues();
+    fetchNews(values, currentPage);
+  };
 
   const languageOptions = [
     { value: "en", label: "English", icon: "🇬🇧" },
@@ -476,7 +581,7 @@ export default function NewsQueryPage() {
               variant="outline"
               size="sm"
               onClick={handleLogout}
-              className="hover:text-black border-white/30 bg-white/10"
+              className="text-white border-white/30 hover:bg-white/10"
             >
               <LogOut className="h-4 w-4 mr-2" />
               Logout
@@ -582,7 +687,14 @@ export default function NewsQueryPage() {
                             ))
                           ) : (
                             <div className="text-center py-4">
-                              <p className="text-muted-foreground">No sources available</p>
+                              {isServerWarming ? (
+                                <div className="flex flex-col items-center gap-2">
+                                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                  <p className="text-muted-foreground">Server warming up, please wait...</p>
+                                </div>
+                              ) : (
+                                <p className="text-muted-foreground">No sources available</p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -595,6 +707,7 @@ export default function NewsQueryPage() {
                             setSelectedSources([]);
                             form.setValue("preferred_sources", []);
                           }}
+                          disabled={selectedSources.length === 0}
                         >
                           Clear All
                         </Button>
@@ -632,6 +745,12 @@ export default function NewsQueryPage() {
       </div>
 
       <div className="container mx-auto max-w-5xl px-4 py-8">
+        {/* Server warming up warning */}
+        <ServerWarmupWarning 
+          isVisible={isServerWarming} 
+          onRetry={handleRetry} 
+        />
+        
         {/* Mobile source filter chips */}
         {selectedSources.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2">
@@ -662,7 +781,7 @@ export default function NewsQueryPage() {
         )}
 
         {/* Error message */}
-        {error && (
+        {error && !isServerWarming && (
           <Alert variant="destructive" className="mb-6">
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -687,6 +806,15 @@ export default function NewsQueryPage() {
         {/* Loading skeletons */}
         {loading && (
           <div className="space-y-6">
+            <div className="text-center mb-4">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                {isServerWarming 
+                  ? "Connecting to server... This may take up to 30 seconds if the server was inactive."
+                  : "Searching for articles..."}
+              </p>
+            </div>
+            
             {Array.from({ length: 3 }).map((_, i) => (
               <Card key={i} className="overflow-hidden">
                 <div className="md:flex">
@@ -733,7 +861,7 @@ export default function NewsQueryPage() {
         )}
 
         {/* No results message */}
-        {!loading && articles.length === 0 && message && (
+        {!loading && articles.length === 0 && message && !isServerWarming && (
           <div className="text-center py-12">
             <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-medium mb-2">No articles found</h3>
@@ -757,9 +885,9 @@ export default function NewsQueryPage() {
         <div className="container mx-auto max-w-5xl px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <h3 className="text-lg font-semibold mb-2">Gemini 1.5 Flash News Search</h3>
+              <h3 className="text-lg font-semibold mb-2">News Search</h3>
               <p className="text-slate-400 text-sm">
-                Cutting-edge multilingual news search powered by advanced AI technology
+                Cutting-edge multilingual news search powered by Gemini 1.5 Flash
               </p>
             </div>
             <div className="flex space-x-4">
@@ -775,7 +903,7 @@ export default function NewsQueryPage() {
             </div>
           </div>
           <div className="mt-6 pt-6 border-t border-slate-800 text-center text-sm text-slate-500">
-            © {new Date().getFullYear()} | Gemini 1.5 Flash News Search
+            © {new Date().getFullYear()} News Search - Powered by Gemini
           </div>
         </div>
       </footer>
