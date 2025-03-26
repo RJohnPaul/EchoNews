@@ -734,193 +734,6 @@ DEFAULT_SOURCE_IMAGES = {
 NEWS_CACHE = {}
 CACHE_EXPIRY = 1800  # 30 minutes in seconds
 
-# Utility function for cosine similarity calculation
-def cosine_similarity(vec1, vec2):
-    """Calculate cosine similarity between two vectors"""
-    if not vec1 or not vec2 or len(vec1) != len(vec2):
-        return 0.0
-    
-    dot_product = sum(a * b for a, b in zip(vec1, vec2))
-    mag1 = sum(a * a for a in vec1) ** 0.5
-    mag2 = sum(b * b for b in vec2) ** 0.5
-    
-    if mag1 * mag2 == 0:
-        return 0.0
-    return dot_product / (mag1 * mag2)
-
-# QuickSelect algorithm for finding kth largest element
-def quick_select(arr, k, key=lambda x: x):
-    """
-    Find the kth largest element in an array using QuickSelect algorithm.
-    
-    Args:
-        arr: List of elements
-        k: The k value (1 for largest, 2 for second largest, etc.)
-        key: Function to extract comparison value
-        
-    Returns:
-        The kth largest element
-    """
-    if not arr or k < 1 or k > len(arr):
-        return None
-    
-    # Convert to 0-based index for finding the kth largest
-    k_idx = len(arr) - k
-    
-    def partition(low, high, pivot_idx):
-        pivot_val = key(arr[pivot_idx])
-        # Move pivot to end
-        arr[pivot_idx], arr[high] = arr[high], arr[pivot_idx]
-        
-        # Move elements smaller than pivot to left
-        store_idx = low
-        for i in range(low, high):
-            if key(arr[i]) <= pivot_val:
-                arr[i], arr[store_idx] = arr[store_idx], arr[i]
-                store_idx += 1
-        
-        # Move pivot to its final position
-        arr[high], arr[store_idx] = arr[store_idx], arr[high]
-        return store_idx
-    
-    def select(low, high, k_idx):
-        if low == high:
-            return arr[low]
-        
-        # Choose pivot (can use median-of-3 for better performance)
-        pivot_idx = (low + high) // 2
-        
-        # Partition around pivot
-        pivot_idx = partition(low, high, pivot_idx)
-        
-        if k_idx == pivot_idx:
-            return arr[k_idx]
-        elif k_idx < pivot_idx:
-            return select(low, pivot_idx - 1, k_idx)
-        else:
-            return select(pivot_idx + 1, high, k_idx)
-    
-    return select(0, len(arr) - 1, k_idx)
-
-# Divide and conquer for clustering similar articles
-def cluster_similar_articles(articles, threshold=0.6):
-    """
-    Cluster similar news articles using divide-and-conquer approach.
-    
-    Args:
-        articles: List of article dictionaries
-        threshold: Similarity threshold for considering articles in same cluster
-        
-    Returns:
-        List of clusters (each cluster is a list of similar articles)
-    """
-    if not articles:
-        return []
-    
-    # For small sets, use direct comparison
-    if len(articles) <= 5:
-        return direct_cluster_articles(articles, threshold)
-    
-    # Create simple embeddings from article text
-    embeddings = {}
-    for article in articles:
-        # Extract text content
-        content = f"{article.get('title', '')} {article.get('summary', '')}"
-        
-        # Create simple term frequency embedding
-        words = re.findall(r'\w+', content.lower())
-        word_freq = {}
-        for word in words:
-            if len(word) > 2:  # Skip short words
-                word_freq[word] = word_freq.get(word, 0) + 1
-                
-        # Convert to vector (normalize by document length)
-        vec = []
-        doc_len = sum(word_freq.values())
-        if doc_len:
-            for word in sorted(word_freq.keys()):
-                vec.append(word_freq[word] / doc_len)
-                
-        if vec:
-            embeddings[article['id']] = vec
-    
-    # Divide step
-    mid = len(articles) // 2
-    left_clusters = cluster_similar_articles(articles[:mid], threshold)
-    right_clusters = cluster_similar_articles(articles[mid:], threshold)
-    
-    # Conquer/merge step
-    result = left_clusters.copy()
-    
-    for right_cluster in right_clusters:
-        merged = False
-        for i, left_cluster in enumerate(result):
-            # Find any pair of similar articles across clusters
-            for r_article in right_cluster:
-                if r_article['id'] not in embeddings:
-                    continue
-                    
-                r_emb = embeddings[r_article['id']]
-                
-                for l_article in left_cluster:
-                    if l_article['id'] not in embeddings:
-                        continue
-                        
-                    l_emb = embeddings[l_article['id']]
-                    
-                    # Check similarity
-                    if len(r_emb) == len(l_emb) and cosine_similarity(r_emb, l_emb) >= threshold:
-                        # Merge clusters
-                        result[i] = list(set(left_cluster + right_cluster))
-                        merged = True
-                        break
-                        
-                if merged:
-                    break
-            if merged:
-                break
-                
-        if not merged:
-            result.append(right_cluster)
-    
-    return result
-
-def direct_cluster_articles(articles, threshold):
-    """Cluster articles directly for small sets"""
-    clusters = []
-    used = set()
-    
-    for i, article in enumerate(articles):
-        if article['id'] in used:
-            continue
-            
-        # Create new cluster
-        cluster = [article]
-        used.add(article['id'])
-        
-        # Simple content-based similarity
-        article_text = f"{article.get('title', '')} {article.get('summary', '')}"
-        words1 = set(re.findall(r'\w+', article_text.lower()))
-        
-        for j in range(i+1, len(articles)):
-            other = articles[j]
-            if other['id'] in used:
-                continue
-                
-            other_text = f"{other.get('title', '')} {other.get('summary', '')}"
-            words2 = set(re.findall(r'\w+', other_text.lower()))
-            
-            # Jaccard similarity for small sets
-            if words1 and words2:
-                similarity = len(words1.intersection(words2)) / len(words1.union(words2))
-                if similarity >= threshold:
-                    cluster.append(other)
-                    used.add(other['id'])
-                    
-        clusters.append(cluster)
-    
-    return clusters
-
 @app.get("/api/py/helloFastApi")
 def hello_fast_api():
     return {"message": "Hello from FastAPI powered by Gemini 1.5 Flash"}
@@ -1207,7 +1020,141 @@ Return ONLY the single most relevant category name from the list.
         print(f"Error determining category with Gemini: {e}")
         return None
 
-# Enhanced search with divide-and-conquer clustering and QuickSelect
+# Gemini 1.5 Flash inspired search enhancement
+def advanced_semantic_search(articles, query, threshold=0.2):
+    """
+    Enhanced search function inspired by Gemini 1.5 Flash capabilities.
+    This simulates semantic search with more advanced term matching.
+    
+    In a real implementation with Gemini API, you would:
+    1. Use embeddings from Gemini for articles and query
+    2. Calculate semantic similarity
+    3. Rank results based on semantic understanding
+    """
+    if not query:
+        return articles, 0
+    
+    # Normalize the query
+    query_lower = query.lower()
+    query_terms = query_lower.split()
+    
+    # Special case for common topics
+    is_sports_query = any(term in query_lower for term in ["vs", "cricket", "ipl", "match", "game", "score", "sport"])
+    is_politics_query = any(term in query_lower for term in ["election", "vote", "minister", "government", "party", "bjp", "congress"])
+    is_tech_query = any(term in query_lower for term in ["ai", "tech", "digital", "app", "mobile", "apple", "google"])
+    is_finance_query = any(term in query_lower for term in ["market", "stock", "finance", "bank", "economy", "rupee", "dollar"])
+    
+    # Special entities (like team acronyms for cricket)
+    team_acronyms = ["csk", "mi", "rcb", "kkr", "srh", "dc", "pbks", "rr", "gt", "lsg"]
+    political_parties = ["bjp", "congress", "aap", "tmc", "sp", "ncp", "rjd", "jdu", "dmk", "aiadmk"]
+    
+    # Enhanced matching based on multiple factors
+    scored_articles = []
+    
+    # First pass - identify potentially relevant articles
+    for article in articles:
+        title_lower = article["title"].lower()
+        summary_lower = article["summary"].lower()
+        combined_text = f"{title_lower} {summary_lower}"
+        
+        # Calculate various relevance signals
+        exact_query_match = query_lower in combined_text
+        
+        # Term matching - count how many query terms appear in the text
+        term_matches = sum(1 for term in query_terms if term in combined_text)
+        term_match_ratio = term_matches / max(1, len(query_terms))
+        
+        # Check for special entities based on query type
+        special_entity_matches = 0
+        if is_sports_query:
+            special_entity_matches = sum(1 for team in team_acronyms if team in combined_text.lower())
+        elif is_politics_query:
+            special_entity_matches = sum(1 for party in political_parties if party in combined_text.lower())
+        
+        # Title matching has higher weight
+        title_term_matches = sum(1 for term in query_terms if term in title_lower)
+        title_match_ratio = title_term_matches / max(1, len(query_terms))
+        
+        # Calculate final relevance score (emulating semantic matching)
+        relevance_score = 0
+        
+        if exact_query_match:
+            relevance_score += 0.6  # Increased weight for exact matches
+        
+        relevance_score += 0.3 * term_match_ratio
+        relevance_score += 0.5 * title_match_ratio  # Increased weight for title matches
+        
+        # Special query type bonus
+        if (is_sports_query and "sport" in combined_text) or \
+           (is_politics_query and "politic" in combined_text) or \
+           (is_tech_query and "tech" in combined_text) or \
+           (is_finance_query and "finance" in combined_text or "market" in combined_text):
+            relevance_score += 0.2
+        
+        if special_entity_matches > 0:
+            relevance_score += 0.1 * min(1.0, special_entity_matches)
+        
+        # Date recency bonus (up to 0.2)
+        try:
+            pub_date = datetime.fromisoformat(article["published_date"].replace('Z', '+00:00'))
+            current_date = datetime.now()
+            days_old = (current_date - pub_date).days
+            recency_bonus = max(0, 0.2 - (days_old * 0.04))  # Stronger recency bonus
+            relevance_score += recency_bonus
+        except:
+            pass
+        
+        # Category matching bonus
+        if "category" in article and article["category"]:
+            category_terms = article["category"].lower().split()
+            if any(term in query_lower for term in category_terms):
+                relevance_score += 0.3  # Significant bonus for category match
+        
+        # Paragraph length bonus (slight preference for more detailed articles)
+        summary_length = len(summary_lower.split())
+        if summary_length > 50:  # Prefer articles with substantial summaries
+            relevance_score += 0.05
+        
+        # Normalize final score
+        relevance_score = min(1.0, relevance_score)
+        
+        # Include article if it has any relevance
+        if relevance_score > threshold or term_matches > 0:
+            article["relevance"] = relevance_score
+            scored_articles.append(article)
+    
+    # Sort by relevance score
+    scored_articles.sort(key=lambda x: x.get("relevance", 0), reverse=True)
+    
+    return scored_articles, len(scored_articles)
+
+# Simulated Gemini function that would be used if API were connected
+def gemini_enhanced_search(articles, query):
+    """
+    This function simulates how Gemini 1.5 Flash could enhance search.
+    In a real implementation, you would call the Gemini API.
+    """
+    try:
+        # Generate embeddings for query
+        query_embedding = model.embed_content(query)
+        
+        # For each article, compute similarity
+        for article in articles:
+            content = article["title"] + " " + article["summary"]
+            article_embedding = model.embed_content(content)
+            
+            # Calculate semantic similarity
+            similarity = compute_similarity(query_embedding, article_embedding)
+            article["relevance"] = similarity
+        
+        # Sort by relevance
+        articles.sort(key=lambda x: x.get("relevance", 0), reverse=True)
+        return articles, len(articles)
+    except Exception as e:
+        print(f"Error using Gemini API: {e}")
+        # Fall back to traditional search
+        return advanced_semantic_search(articles, query)
+
 @app.post("/api/news", response_model=NewsResponse)
 async def get_news(request: NewsRequest):
     try:
@@ -1334,27 +1281,11 @@ async def get_news(request: NewsRequest):
         
         print(f"Total articles after source filtering: {len(articles)}")
         
-        # Apply search if query is provided
+        # Apply Gemini-inspired search (in production, would use gemini_enhanced_search)
         if query:
-            # Initial semantic search to compute relevance scores
             filtered_articles, total_matches = advanced_semantic_search(articles, query)
             
             if filtered_articles:
-                # Find clusters of similar articles using divide-and-conquer
-                article_clusters = cluster_similar_articles(filtered_articles)
-                
-                # Get representative (most relevant) article from each cluster using QuickSelect
-                diverse_results = []
-                for cluster in article_clusters:
-                    if len(cluster) > 0:
-                        best_article = quick_select(cluster, 1, key=lambda x: x.get('relevance', 0))
-                        if best_article:
-                            diverse_results.append(best_article)
-                
-                # If we have enough diverse results, use them instead
-                if len(diverse_results) >= min(10, len(filtered_articles)):
-                    filtered_articles = sorted(diverse_results, key=lambda x: x.get('relevance', 0), reverse=True)
-                
                 category_msg = f" in {category}" if category else ""
                 message = f"Found {total_matches} articles matching '{query}'{category_msg}."
             else:
