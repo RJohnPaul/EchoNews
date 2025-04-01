@@ -1,4 +1,4 @@
- # NewsAI
+ # EchoNews
  
 <p align="center">
   <img src="https://github.com/RJohnPaul/newsAI/blob/049305feb7bb35d97b7641d009a83268ce657395/Template%20Example.png" alt="YouNotes Logo"/>
