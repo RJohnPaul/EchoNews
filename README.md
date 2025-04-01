@@ -85,6 +85,9 @@ The EchoNews backend exposes several RESTful endpoints for integration:
   - Returns a sample message : "Hello from FastAPI powered by Gemini 1.5 Flash"
   - This makes sure the api is running in backend
 
+## Research Papers based on concept
+ - [IEEE-Explore-paper-1](https://ieeexplore.ieee.org/document/5072521)
+ - [IEEE-Explore-paper-2](https://ieeexplore.ieee.org/document/5578100)
 ## Contributing to EchoNews
 
 We welcome contributions from developers of all skill levels. To contribute:
