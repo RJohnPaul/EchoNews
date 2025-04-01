@@ -1,68 +1,100 @@
- # EchoNews
- 
+# EchoNews: AI-Powered News Aggregation Platform
+
 <p align="center">
-  <img src="https://github.com/RJohnPaul/newsAI/blob/5de1faa521a7c5651845d2cac8d6781c6e1bb9e7/Template%20Example%20(1).png" alt="YouNotes Logo"/>
+  <img src="https://github.com/RJohnPaul/newsAI/blob/5de1faa521a7c5651845d2cac8d6781c6e1bb9e7/Template%20Example%20(1).png" alt="EchoNews Logo"/>
 </p>
 
+## Overview
 
-NewsAI is an AI-powered personalized news aggregation and summarization web application. It fetches articles from multiple RSS feeds, processes them using AI models, and provides concise summaries to users. Inspired by the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi), this project integrates Next.js for the frontend and FastAPI for the backend.
+EchoNews is a sophisticated AI-powered news aggregation and summarization platform that transforms how users consume digital content. Leveraging cutting-edge artificial intelligence, EchoNews automatically collects articles from diverse RSS feeds, processes them through advanced machine learning models, and delivers personalized, concise summaries tailored to individual preferences. Built on a robust architecture integrating Next.js for the frontend and FastAPI for the backend, EchoNews creates an intuitive and seamless news experience.
 
-## Features
-- **Personalized News Feed**: Fetches articles from multiple RSS sources.
-- **AI Summarization**: Uses LLaMA or other AI models to generate concise summaries.
-- **Category-Based Filtering**: Users can filter news based on categories.
-- **Responsive UI**: Optimized for both desktop and mobile devices.
-- **Efficient API Handling**: Utilizes FastAPI for backend processing.
+## Key Features
 
-## Tech Stack
-- **Frontend**: Next.js, React, TailwindCSS
-- **Backend**: FastAPI, Python
-- **Database**: PostgreSQL (Supabase)
-- **AI Models**: LLaMA for summarization
-- **Hosting**: Vercel (Frontend), Render (Backend)
+- **Intelligent News Personalization**: Advanced algorithm that curates content from multiple RSS sources based on user preferences and reading patterns
+- **State-of-the-Art AI Summarization**: Utilizes LLaMA and other sophisticated AI models to generate comprehensive yet concise article summaries while preserving key information
+- **Dynamic Category Navigation**: Intuitive filtering system allowing users to explore news across multiple dimensions and interests
+- **Responsive Cross-Platform Design**: Meticulously crafted interface optimized for seamless experiences across desktop, tablet, and mobile devices
+- **High-Performance Backend**: Scalable FastAPI architecture ensuring rapid response times and efficient data processing
 
+## Technical Architecture
+
+### Frontend
+- **Framework**: Next.js with React for component-based UI development
+- **Styling**: TailwindCSS for responsive design and consistent visual identity
+- **State Management**: React Context API and custom hooks for efficient state handling
+
+### Backend
+- **API Framework**: FastAPI for high-performance, asynchronous request handling
+- **Language**: Python 3.8+ with type annotations
+- **Data Processing**: Custom NLP pipelines for content analysis
+
+### Infrastructure
+- **Database**: PostgreSQL hosted on Supabase for reliable data persistence
+- **AI Integration**: LLaMA models optimized for text summarization tasks
+- **Deployment**: Vercel for frontend services, Render for backend processes
+
+## Installation Guide
 
 ### Prerequisites
-Ensure you have the following installed:
-- Node.js (>= 16.x)
-- Python (>= 3.8)
+Before beginning installation, ensure your development environment includes:
+- Node.js (version 16.x or higher)
+- Python (version 3.8 or higher)
+- Git for version control
 
-### Clone the Repository
-```bash
-git clone https://github.com/RJohnPaul/newsAI.git
-cd newsAI
-```
+### Setup Instructions
 
-### Install Frontend Dependencies
-```bash
-npm install
-```
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/RJohnPaul/newsAI.git
+   cd newsAI
+   ```
 
-### Install Backend Dependencies
-```bash
-pip install -r requirements.txt
-```
+2. **Configure Frontend Environment**
+   ```bash
+   npm install
+   ```
 
-### Running the Application
-```bash
-npm run api-all
-```
-This will start both the Next.js frontend and FastAPI backend.
+3. **Prepare Backend Services**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## API Endpoints
-The FastAPI backend exposes several endpoints:
+4. **Launch Development Environment**
+   ```bash
+   npm run api-all
+   ```
+   This command initializes both the Next.js frontend server and FastAPI backend services simultaneously.
 
-- **Fetch Articles**: `/api/fetch-articles` (Fetches RSS feed articles)
-- **Summarize Article**: `/api/summarize` (Generates AI-based summary)
-- **Get Categories**: `/api/categories` (Lists available categories)
+## Localhost Running
 
-## Contribution
-1. Fork the repository
-2. Create a new feature branch (`git checkout -b feature-name`)
-3. Commit your changes (`git commit -m "Added new feature"`)
-4. Push to your fork and submit a pull request
+- replace the const ```bash BASE_URL = "http://127.0.0.1:8000" ```  at **api/news/route.ts**
 
+
+## API Documentation
+
+The EchoNews backend exposes several RESTful endpoints for integration:
+
+- **Article Retrieval**: `/api/news/sources/{language}`
+  - Gets list of available news sources for a specific language
+
+- **Main Article Fetching**: `/api/news`
+  - Returns article without language
+  - Includes article counts and relationship metadata
+
+- **Api Running Checker**: `/api/news`
+  - Returns a sample message : "Hello from FastAPI powered by Gemini 1.5 Flash"
+  - This makes sure the api is running in backend
+
+## Contributing to EchoNews
+
+We welcome contributions from developers of all skill levels. To contribute:
+
+1. Fork the official repository
+2. Create a feature branch with descriptive naming (`git checkout -b feature/enhanced-summarization`)
+3. Implement your changes with appropriate tests
+4. Commit with clear, descriptive messages (`git commit -m "Implemented enhanced summarization algorithm"`)
+5. Push to your fork and submit a detailed pull request
 
 ---
-This project was built using the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi) as a base.
 
+This project builds upon the architectural foundation of the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi), extending it with custom AI capabilities and news-specific features.
