@@ -1,7 +1,7 @@
  # EchoNews
  
 <p align="center">
-  <img src="https://github.com/RJohnPaul/newsAI/blob/049305feb7bb35d97b7641d009a83268ce657395/Template%20Example.png" alt="YouNotes Logo"/>
+  <img src="https://github.com/RJohnPaul/newsAI/blob/5de1faa521a7c5651845d2cac8d6781c6e1bb9e7/Template%20Example%20(1).png" alt="YouNotes Logo"/>
 </p>
 
 
