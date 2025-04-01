@@ -81,7 +81,7 @@ The EchoNews backend exposes several RESTful endpoints for integration:
   - Returns article without language
   - Includes article counts and relationship metadata
 
-- **Api Running Checker**: `/api/news`
+- **Api Running Checker**: `/api/Helloapi`
   - Returns a sample message : "Hello from FastAPI powered by Gemini 1.5 Flash"
   - This makes sure the api is running in backend
 
