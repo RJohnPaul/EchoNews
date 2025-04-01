@@ -100,7 +100,7 @@ We welcome contributions from developers of all skill levels. To contribute:
 
 ## Why Not Try on Collab?
 
-- There is **OGNEWS.ipynb** file where the code can be executed in google collab for results
+- There is [OGNEWS.ipynb](https://github.com/RJohnPaul/EchoNews/blob/d3ead31ae22ca79935031fb64a404b6e4aca90b4/OGNEWS.ipynb) file where the code can be executed in google collab for results
 
 ---
 
