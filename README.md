@@ -29,9 +29,9 @@ EchoNews is a sophisticated AI-powered news aggregation and summarization platfo
 - **Data Processing**: Custom NLP pipelines for content analysis
 
 ### Infrastructure
-- **Database**: PostgreSQL hosted on Supabase for reliable data persistence
-- **AI Integration**: LLaMA models optimized for text summarization tasks
-- **Deployment**: Vercel for frontend services, Render for backend processes
+- **To Do ->** `Database: PostgreSQL hosted on Supabase for reliable data persistence`
+- **AI Integration**: LLaMA model optimized for text summarization tasks
+- **Deployment**: Vercel for frontend services, Render for backend processes and fastapi initialization
 
 ## Installation Guide
 
