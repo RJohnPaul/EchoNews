@@ -98,6 +98,10 @@ We welcome contributions from developers of all skill levels. To contribute:
 4. Commit with clear, descriptive messages (`git commit -m "Implemented enhanced summarization algorithm"`)
 5. Push to your fork and submit a detailed pull request
 
+## Why Not Try on Collab?
+
+- There is **OGNEWS.ipynb** file where the code can be executed in google collab for results
+
 ---
 
 This project builds upon the architectural foundation of the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi), extending it with custom AI capabilities and news-specific features.
