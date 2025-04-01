@@ -1,8 +1,9 @@
+ # NewsAI
+ 
 <p align="center">
   <img src="https://github.com/RJohnPaul/newsAI/blob/049305feb7bb35d97b7641d009a83268ce657395/Template%20Example.png" alt="YouNotes Logo"/>
 </p>
 
- # NewsAI
 
 NewsAI is an AI-powered personalized news aggregation and summarization web application. It fetches articles from multiple RSS feeds, processes them using AI models, and provides concise summaries to users. Inspired by the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi), this project integrates Next.js for the frontend and FastAPI for the backend.
 
