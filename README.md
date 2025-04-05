@@ -100,7 +100,7 @@ We welcome contributions from developers of all skill levels. To contribute:
 
 ## Why Not Try on Collab?
 
-- There is [OGNEWS.ipynb](https://github.com/RJohnPaul/EchoNews/blob/d3ead31ae22ca79935031fb64a404b6e4aca90b4/OGNEWS.ipynb) file where the code can be executed in google collab for results
+- There is [ML-Model](https://colab.research.google.com/drive/1PkJF65fwN8w_OoccX2jg0o1P8Cjzp6ah?usp=sharing) which is in google collab and can be used to test the model
 
 ---
 
