@@ -98,6 +98,9 @@ We welcome contributions from developers of all skill levels. To contribute:
 4. Commit with clear, descriptive messages (`git commit -m "Implemented enhanced summarization algorithm"`)
 5. Push to your fork and submit a detailed pull request
 
+## Updates
+ - Modified and Boosted the API fetching speed from 13.82 s to 4 - 6 s (approx)
+
 ## Why Not Try on Collab?
 
 - There is a [ML-Model](https://colab.research.google.com/drive/1PkJF65fwN8w_OoccX2jg0o1P8Cjzp6ah?usp=sharing) which is in google collab and can be used to test the model
