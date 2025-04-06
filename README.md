@@ -67,7 +67,7 @@ Before beginning installation, ensure your development environment includes:
 
 ## Localhost Running
 
-- replace the const ```bash BASE_URL = "http://127.0.0.1:8000" ```  at **api/news/route.ts**
+- replace the const ```bash BASE_URL = "http://127.0.0.1:8000" ```  at **api/news/route.ts** and change env value of ```NEXT_PUBLIC_API_URL```
 
 
 ## API Documentation
@@ -100,8 +100,8 @@ We welcome contributions from developers of all skill levels. To contribute:
 
 ## Why Not Try on Collab?
 
-- There is [ML-Model](https://colab.research.google.com/drive/1PkJF65fwN8w_OoccX2jg0o1P8Cjzp6ah?usp=sharing) which is in google collab and can be used to test the model
+- There is a [ML-Model](https://colab.research.google.com/drive/1PkJF65fwN8w_OoccX2jg0o1P8Cjzp6ah?usp=sharing) which is in google collab and can be used to test the model
 
 ---
 
-This project builds upon the architectural foundation of the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi), extending it with custom AI capabilities and news-specific features.
+This project is built upon the architectural foundation of the [Next.js FastAPI boilerplate](https://github.com/digitros/nextjs-fastapi), extending it with custom AI capabilities and news-specific features.
