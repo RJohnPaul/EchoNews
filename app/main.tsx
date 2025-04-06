@@ -360,7 +360,7 @@ export default function NewsQueryPage() {
   // Server wake-up ping on initial load
   useEffect(() => {
     // Configure the ping service with the local URL
-    pingService.updateUrl("http://127.0.0.1:8000");
+    pingService.updateUrl("https://newsai-swc7.onrender.com");
     
     // Start the ping service - this will run the first ping immediately
     // and then continue pinging at regular intervals

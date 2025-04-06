@@ -10,7 +10,7 @@ class PingService {
   private intervalTime: number;
   
   constructor(url: string = '', intervalMinutes: number = 14) {
-    this.pingUrl = url || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    this.pingUrl = url || process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com";
     this.intervalTime = intervalMinutes * 60 * 1000; // convert to milliseconds
   }
   

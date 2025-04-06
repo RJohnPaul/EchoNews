@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = "https://newsai-swc7.onrender.com";
 const TIMEOUT_DURATION = 60000; // 60 seconds timeout
 
 export async function POST(request: Request) {
