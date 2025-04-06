@@ -2,9 +2,6 @@
  * Service to keep the Render backend alive by sending periodic requests
  */
 class PingService {
-  updateUrl(arg0: string) {
-    throw new Error("Method not implemented.");
-  }
   private interval: NodeJS.Timeout | null = null;
   private pingUrl: string;
   private intervalTime: number;
