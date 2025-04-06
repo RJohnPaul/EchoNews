@@ -67,6 +67,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
+import pingService from "@/lib/ping-service";
 
 // Define form schema with Zod
 const formSchema = z.object({
@@ -358,25 +359,17 @@ export default function NewsQueryPage() {
   
   // Server wake-up ping on initial load
   useEffect(() => {
-    const pingServer = async () => {
-      try {
-        // Send a lightweight request to wake up the server
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com"}/api/health`, {
-          method: "GET",
-          cache: "no-store",
-        });
-        console.log("Backend server ping successful");
-      } catch (err) {
-        console.log("Backend server ping failed, may need warm-up time");
-      }
+    // Configure the ping service with the local URL
+    pingService.updateUrl("http://127.0.0.1:8000");
+    
+    // Start the ping service - this will run the first ping immediately
+    // and then continue pinging at regular intervals
+    pingService.start();
+    
+    // Clean up function
+    return () => {
+      pingService.stop();
     };
-    
-    pingServer();
-    
-    // Set up periodic ping to keep server warm (every 14 minutes)
-    const pingInterval = setInterval(pingServer, 14 * 60 * 1000);
-    
-    return () => clearInterval(pingInterval);
   }, []);
   
   // Check if user is logged in
