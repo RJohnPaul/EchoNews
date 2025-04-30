@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
     // Try to fetch trending news from backend FastAPI first
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://newsai-swc7.onrender.com';
       const response = await fetch(`${backendUrl}/api/trending?language=${language}&limit=${limit}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },

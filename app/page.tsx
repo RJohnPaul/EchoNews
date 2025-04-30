@@ -488,7 +488,7 @@ export default function NewsQueryPage() {
         // Then try the backend server if available
         try {
           console.log("Pinging backend server");
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/py/helloFastApi`, {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com"}/api/py/helloFastApi`, {
             method: "GET",
             cache: "no-store",
             signal: AbortSignal.timeout(3000) // 3 second timeout

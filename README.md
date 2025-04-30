@@ -67,7 +67,7 @@ Before beginning installation, ensure your development environment includes:
 
 ## Localhost Running
 
-- replace the const ```bash BASE_URL = "http://127.0.0.1:8000" ```  at **api/news/route.ts** and change env value of ```NEXT_PUBLIC_API_URL```
+- replace the const ```bash BASE_URL = "https://newsai-swc7.onrender.com" ```  at **api/news/route.ts** and change env value of ```NEXT_PUBLIC_API_URL```
 
 
 ## API Documentation
