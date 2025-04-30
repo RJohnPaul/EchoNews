@@ -77,6 +77,8 @@ const formSchema = z.object({
     required_error: "Please select a language",
   }),
   preferred_sources: z.array(z.string()).optional(),
+  date_range: z.string().optional(),
+  results_per_page: z.string().optional(),
 });
 
 // Define the types
@@ -105,6 +107,23 @@ interface NewsResponse {
   total_pages: number;
   current_page: number;
   available_sources: string[];
+}
+
+// Define trending news types 
+interface SentimentInfo {
+  score: number;
+  magnitude: number;
+  label: string;
+}
+
+interface TrendingNewsArticle extends NewsArticle {
+  sentiment?: SentimentInfo;
+}
+
+interface TrendingNewsResponse {
+  articles: TrendingNewsArticle[];
+  message: string;
+  categories: Record<string, number>;
 }
 
 // Get relative time format
@@ -185,6 +204,32 @@ function RelevanceIndicator({ score }: { score?: number }) {
   );
 }
 
+// Sentiment indicator component
+function SentimentIndicator({ sentiment }: { sentiment?: SentimentInfo }) {
+  if (!sentiment) return null;
+  
+  const getSentimentColor = (label: string, score: number) => {
+    if (label === "positive") return "text-green-500";
+    if (label === "negative") return "text-red-500";
+    if (label === "mixed") return "text-amber-500";
+    return "text-gray-500"; // neutral
+  };
+  
+  const getSentimentIcon = (label: string) => {
+    if (label === "positive") return "😊";
+    if (label === "negative") return "😞";
+    if (label === "mixed") return "😐";
+    return "🔍"; // neutral
+  };
+  
+  return (
+    <div className={`flex items-center gap-1 text-xs ${getSentimentColor(sentiment.label, sentiment.score)}`}>
+      <span>{getSentimentIcon(sentiment.label)}</span>
+      <span className="capitalize">{sentiment.label}</span>
+    </div>
+  );
+}
+
 // Article card component
 function ArticleCard({ article }: { article: NewsArticle }) {
   return (
@@ -236,6 +281,73 @@ function ArticleCard({ article }: { article: NewsArticle }) {
             </CardFooter>
           </div>
         </div>
+      </Card>
+    </motion.div>
+  );
+}
+
+// Trending News Card component
+function TrendingNewsCard({ article }: { article: TrendingNewsArticle }) {
+  // Use a different styling than regular article cards
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col h-full"
+    >
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
+        <div className="relative">
+          {article.image_url ? (
+            <div className="h-48 overflow-hidden bg-slate-100">
+              <img 
+                src={article.image_url} 
+                alt={article.title}
+                className="w-full h-full object-cover" 
+                onError={(e) => {
+                  // Fallback if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.src = "https://www.shutterstock.com/image-vector/live-breaking-news-template-business-600w-1897043905.jpg";
+                }}
+              />
+            </div>
+          ) : (
+            <div className="h-48 bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center">
+              <Newspaper className="h-12 w-12 text-white/80" />
+            </div>
+          )}
+          
+          {article.sentiment && (
+            <div className="absolute top-2 right-2 bg-white/90 dark:bg-slate-800/90 rounded-md px-2 py-1 backdrop-blur-sm">
+              <SentimentIndicator sentiment={article.sentiment} />
+            </div>
+          )}
+        </div>
+        
+        <CardHeader className="pb-2 flex-grow">
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="text-xs font-normal">
+              {article.source.name}
+            </Badge>
+          </div>
+          <CardTitle className="text-lg mt-2 line-clamp-2">{article.title}</CardTitle>
+          <div className="flex items-center text-xs text-muted-foreground">
+            <Clock className="h-3 w-3 mr-1" />
+            {getRelativeTime(article.published_date)}
+          </div>
+        </CardHeader>
+        
+        <CardContent className="pb-2">
+          <p className="text-sm text-muted-foreground line-clamp-2">{article.summary}</p>
+        </CardContent>
+        
+        <CardFooter className="pt-2 mt-auto">
+          <Button variant="outline" size="sm" asChild className="w-full">
+            <a href={article.link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center">
+              Read full story <ExternalLink className="h-3 w-3 ml-1" />
+            </a>
+          </Button>
+        </CardFooter>
       </Card>
     </motion.div>
   );
@@ -353,30 +465,46 @@ export default function NewsQueryPage() {
   const [totalFound, setTotalFound] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0);
-  const [pageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(20); // Changed to state for dynamic control
   const [autoScrollEnabled, setAutoScrollEnabled] = useState<boolean>(true);
-  
+  const [category, setCategory] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<string | null>(null); // New state for date range filtering
+  const [trendingArticles, setTrendingArticles] = useState<TrendingNewsArticle[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState<boolean>(false);
+  const [trendingError, setTrendingError] = useState<string | null>(null);
+
   // Server wake-up ping on initial load
   useEffect(() => {
     const pingServer = async () => {
       try {
-        // Send a lightweight request to wake up the server
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/health`, {
+        // First try the local health check endpoint
+        console.log("Pinging local health endpoint");
+        await fetch(`/api/health`, {
           method: "GET",
           cache: "no-store",
         });
-        console.log("Backend server ping successful");
+        console.log("Local health endpoint responded successfully");
+        
+        // Then try the backend server if available
+        try {
+          console.log("Pinging backend server");
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/py/helloFastApi`, {
+            method: "GET",
+            cache: "no-store",
+            signal: AbortSignal.timeout(3000) // 3 second timeout
+          });
+          console.log("Backend server ping successful");
+          setIsServerWarming(false);
+        } catch (backendErr) {
+          console.log("Backend server ping failed, may need warm-up time");
+          setIsServerWarming(true);
+        }
       } catch (err) {
-        console.log("Backend server ping failed, may need warm-up time");
+        console.log("Health endpoint ping failed:", err);
       }
     };
     
     pingServer();
-    
-    // Set up periodic ping to keep server warm (every 14 minutes)
-    const pingInterval = setInterval(pingServer, 14 * 60 * 1000);
-    
-    return () => clearInterval(pingInterval);
   }, []);
   
   // Check if user is logged in
@@ -409,6 +537,8 @@ export default function NewsQueryPage() {
       query: "",
       language: "en",
       preferred_sources: [],
+      date_range: "all",
+      results_per_page: "20",
     },
   });
 
@@ -459,6 +589,29 @@ export default function NewsQueryPage() {
     }
   }, [selectedLanguage, form]);
 
+  // Initial load - fetch trending/latest news
+  useEffect(() => {
+    // Only fetch initial news if we don't already have articles
+    if (articles.length === 0 && !loading) {
+      const fetchInitialNews = async () => {
+        // Get form default values
+        const values = form.getValues();
+        try {
+          await fetchNews(values, 1, true);
+        } catch (err) {
+          console.error("Error fetching initial news:", err);
+        }
+      };
+      
+      fetchInitialNews();
+    }
+  }, []);
+
+  // Fetch trending news on initial load
+  useEffect(() => {
+    fetchTrendingNews();
+  }, [selectedLanguage]); // Refresh trending news when language changes
+
   // Handle source selection
   const toggleSource = (source: string) => {
     const newSources = selectedSources.includes(source)
@@ -479,12 +632,33 @@ export default function NewsQueryPage() {
     }
   };
 
+  // Handle category selection
+  const handleCategorySelect = (selectedCategory: string | null) => {
+    setCategory(selectedCategory);
+    // If a category is selected, update the current search with that category
+    if (selectedCategory) {
+      const values = form.getValues();
+      fetchNews(values, 1, false, selectedCategory);
+    }
+  };
+
   // Fetch news from API with retry mechanism
-  const fetchNews = async (values: z.infer<typeof formSchema>, page = 1) => {
+  const fetchNews = async (values: z.infer<typeof formSchema>, page = 1, isInitial = false, selectedCategory: string | null = null) => {
     setLoading(true);
     setError(null);
     
     try {
+      // Calculate date filter if needed
+      let from_date: string | undefined = undefined;
+      if (values.date_range && values.date_range !== "all") {
+        const days = parseInt(values.date_range);
+        if (!isNaN(days)) {
+          const date = new Date();
+          date.setDate(date.getDate() - days);
+          from_date = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        }
+      }
+      
       // Use fetchWithRetry to handle timeouts and retries
       const response = await fetchWithRetry("/api/news", {
         method: "POST",
@@ -497,8 +671,11 @@ export default function NewsQueryPage() {
           page: page,
           page_size: pageSize,
           preferred_sources: values.preferred_sources || [],
+          category: selectedCategory || category,
+          initial_load: isInitial,
+          from_date: from_date
         }),
-      }, 3); // Try up to 3 times with backoff
+      }, 3, 2000, 120000); // Increase timeout to 120 seconds for more thorough searches
 
       if (response.status === 504) {
         setIsServerWarming(true);
@@ -544,6 +721,55 @@ export default function NewsQueryPage() {
     }
   };
 
+  // Fetch trending news
+  const fetchTrendingNews = async () => {
+    setTrendingLoading(true);
+    setTrendingError(null);
+    
+    try {
+      // Get current language from form
+      const language = form.getValues("language");
+      
+      const response = await fetchWithRetry(`/api/trending?language=${language}&limit=12`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }, 3, 2000, 60000);
+      
+      if (response.status === 504) {
+        setIsServerWarming(true);
+        setTrendingError("The server is taking longer than expected to respond. It might be starting up after inactivity.");
+        setTrendingLoading(false);
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data: TrendingNewsResponse = await response.json();
+      
+      // Server responded successfully
+      setIsServerWarming(false);
+      setTrendingArticles(data.articles);
+      
+    } catch (err) {
+      console.error("Error fetching trending news:", err);
+      
+      // Check if it's likely a timeout issue
+      if (err instanceof Error && 
+          (err.message.includes("timeout") || err.message.includes("network") || err.name === "AbortError")) {
+        setIsServerWarming(true);
+        setTrendingError("Connection to the server timed out when fetching trending news.");
+      } else {
+        setTrendingError(err instanceof Error ? err.message : "An unknown error occurred");
+      }
+    } finally {
+      setTrendingLoading(false);
+    }
+  };
+
   // Handle form submission
   async function onSubmit(values: z.infer<typeof formSchema>) {
     // Reset to first page on new search
@@ -551,6 +777,11 @@ export default function NewsQueryPage() {
     setArticles([]);
     setMessage("");
     setTotalFound(0);
+    
+    // Reset category filter on new search unless explicitly kept
+    if (!values.query.toLowerCase().includes("category:")) {
+      setCategory(null);
+    }
     
     await fetchNews(values, 1);
   }
@@ -569,6 +800,29 @@ export default function NewsQueryPage() {
     { value: "mr", label: "Marathi", icon: "🇮🇳" },
     { value: "gu", label: "Gujarati", icon: "🇮🇳" },
   ];
+
+  // Watch for results per page changes
+  const selectedResultsPerPage = form.watch("results_per_page");
+  const selectedDateRange = form.watch("date_range");
+  
+  // Update page size when form selection changes
+  useEffect(() => {
+    if (selectedResultsPerPage) {
+      setPageSize(parseInt(selectedResultsPerPage));
+    }
+  }, [selectedResultsPerPage]);
+  
+  // Update date range filter
+  useEffect(() => {
+    if (selectedDateRange) {
+      setDateRange(selectedDateRange);
+      if (articles.length > 0) {
+        // Refresh search with new date range if we already have results
+        const values = form.getValues();
+        fetchNews(values, 1);
+      }
+    }
+  }, [selectedDateRange]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
@@ -718,7 +972,68 @@ export default function NewsQueryPage() {
                     </SheetContent>
                   </Sheet>
                 </div>
-                
+
+                {/* Additional filter controls - Date Range and Results Per Page */}
+                <div className="flex flex-wrap gap-4 mb-6 mt-4">
+                  {/* Date Range Filter */}
+                  <div className="flex-1 min-w-[200px]">
+                    <h3 className="text-lg font-medium mb-3">Recent Days Filter</h3>
+                    <Form {...form}>
+                      <FormField
+                        control={form.control}
+                        name="date_range"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select time period" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="all">All Time</SelectItem>
+                                <SelectItem value="1">Last 24 Hours</SelectItem>
+                                <SelectItem value="7">Last 7 Days</SelectItem>
+                                <SelectItem value="14">Last 14 Days</SelectItem>
+                                <SelectItem value="30">Last 30 Days</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+                    </Form>
+                  </div>
+                  
+                  {/* Results Per Page */}
+                  <div className="flex-1 min-w-[200px]">
+                    <h3 className="text-lg font-medium mb-3">Results Per Page</h3>
+                    <Form {...form}>
+                      <FormField
+                        control={form.control}
+                        name="results_per_page"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Number of results" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="5">5 Results</SelectItem>
+                                <SelectItem value="10">10 Results</SelectItem>
+                                <SelectItem value="20">20 Results</SelectItem>
+                                <SelectItem value="30">30 Results</SelectItem>
+                                <SelectItem value="50">50 Results</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+                    </Form>
+                  </div>
+                </div>
+
                 <div className="flex justify-center">
                   <Button 
                     type="submit" 
@@ -750,6 +1065,113 @@ export default function NewsQueryPage() {
           isVisible={isServerWarming} 
           onRetry={handleRetry} 
         />
+        
+        {/* Trending News Today Section */}
+        <div className="mb-10 pb-8 border-b">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 text-transparent bg-clip-text">
+              Trending News Today
+            </h2>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchTrendingNews}
+              disabled={trendingLoading}
+            >
+              {trendingLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-2">Refresh</span>
+            </Button>
+          </div>
+          
+          {trendingError && !isServerWarming && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTitle>Error loading trending news</AlertTitle>
+              <AlertDescription>{trendingError}</AlertDescription>
+            </Alert>
+          )}
+          
+          {trendingLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <div className="flex flex-col h-full">
+                    <Skeleton className="h-48 w-full" />
+                    <CardHeader className="pb-2">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-6 w-full mt-2" />
+                      <Skeleton className="h-4 w-28 mt-1" />
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      <Skeleton className="h-4 w-full mb-2" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </CardContent>
+                    <CardFooter className="pt-2">
+                      <Skeleton className="h-9 w-full" />
+                    </CardFooter>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <>
+              {trendingArticles.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <AnimatePresence>
+                    {trendingArticles.map((article) => (
+                      <TrendingNewsCard key={article.id} article={article} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-medium mb-2">No trending articles available</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Try changing language or refreshing in a moment
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={fetchTrendingNews} 
+                    className="mx-auto"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        
+        {/* Category filter chips */}
+        <div className="mt-2 mb-6">
+          <h3 className="text-lg font-medium mb-3">Popular Categories</h3>
+          <div className="flex flex-wrap gap-2">
+            {["News", "Business", "Technology", "Sports", "Entertainment", "Health", "Science", "Politics"].map(cat => (
+              <Button
+                key={cat}
+                variant={category === cat ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleCategorySelect(category === cat ? null : cat)}
+                className="mb-1"
+              >
+                {cat}
+                {category === cat && (
+                  <span className="ml-1 text-xs" onClick={(e) => {
+                    e.stopPropagation();
+                    handleCategorySelect(null);
+                  }}>
+                    ×
+                  </span>
+                )}
+              </Button>
+            ))}
+          </div>
+        </div>
         
         {/* Mobile source filter chips */}
         {selectedSources.length > 0 && (

@@ -12,7 +12,8 @@ import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx
 import os
-
+import asyncio
+import tldextract
 
 import google.generativeai as genai
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDOrCItR_V5KP0oD0jP1OMmTNrnS4Oe2_k")
@@ -20,7 +21,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # NewsAPI fallback
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "dd52e9d920b247e1b51fa8c08ca5b662")  # Get your free key from newsapi.org
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "geyhAiJcUMZJc5qJjYw_3-aQbLIV24A1QKpBE1QnDvE1AwHI")  # Updated NewsAPI key
 
 # Set default socket timeout for all connections
 socket.setdefaulttimeout(5.0)  # Reduce timeout from 15s to 5s
@@ -109,7 +110,16 @@ RSS_FEEDS = {
         "ta": [
             "https://tamil.oneindia.com/rss/tamil-news.xml",
             "https://tamil.samayam.com/rssfeedstopstories.cms",
-            "https://www.dinamani.com/rss/latest-news.xml"
+            "https://www.dinamani.com/rss/latest-news.xml",
+            "https://feeds.feedburner.com/Hindu_Tamil_india",
+            "https://feeds.feedburner.com/Hindu_Tamil_tamilnadu",
+            "https://feeds.feedburner.com/Hindu_Tamil_tamilnadu",
+            "https://feeds.feedburner.com/Hindu_Tamil_environment",
+            "https://feeds.feedburner.com/Hindu_Tamil_sports",
+            "https://feeds.feedburner.com/Hindu_Tamil_world",
+            "https://feeds.feedburner.com/Hindu_Tamil_business",
+            "https://feeds.feedburner.com/Hindu_Tamil_cinema",
+            "https://feeds.feedburner.com/Hindu_Tamil_reporters-page",
         ],
         "te": [
             "https://telugu.oneindia.com/rss/telugu-news.xml",
@@ -1543,3 +1553,130 @@ async def get_news(request: NewsRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing news: {str(e)}")
+
+@app.get("/api/trending")
+async def get_trending_news(language: str = "en", limit: int = 10):
+    """
+    Get trending news articles with sentiment analysis.
+    Uses divide and conquer approach for efficient processing.
+    """
+    try:
+        start_time = time.time()
+        print(f"Fetching trending news for language: {language}, limit: {limit}")
+        
+        # Check cache first
+        cache_key = f"trending-{language}-{limit}"
+        current_time = time.time()
+        
+        if cache_key in NEWS_CACHE and (current_time - NEWS_CACHE[cache_key]["timestamp"] < 900):  # 15 minutes
+            cached_data = NEWS_CACHE[cache_key]
+            print(f"Returning cached trending news in {time.time() - start_time:.3f}s")
+            return cached_data["data"]
+        
+        # Divide and conquer approach:
+        # 1. Divide: Split categories into groups for parallel processing
+        # 2. Conquer: Process each category group concurrently
+        # 3. Combine: Merge and rank results
+
+        # Step 1: Divide - Select most important categories for trending news
+        trending_categories = ["News", "Tech", "Business & Economy", "Sports", "Science", "Entertainment"]
+        
+        # Create category groups for balanced workload
+        category_groups = [
+            ["News", "Business & Economy"],
+            ["Tech", "Science"],
+            ["Sports", "Entertainment"]
+        ]
+        
+        # Step 2: Conquer - Process each category group concurrently
+        group_results = []
+        
+        async def process_category_group(categories):
+            group_articles = []
+            for category in categories:
+                if category in RSS_FEEDS and language in RSS_FEEDS[category]:
+                    feeds = RSS_FEEDS[category][language]
+                    # Get a subset of feeds for faster response
+                    selected_feeds = feeds[:min(5, len(feeds))]
+                    articles = fetch_all_feeds(selected_feeds, category=category)
+                    # Sort by date and take the most recent
+                    articles.sort(key=lambda x: x.get("published_date", ""), reverse=True)
+                    group_articles.extend(articles[:10])  # Take top 10 from each category
+            return group_articles
+        
+        # Process groups concurrently
+        tasks = [process_category_group(group) for group in category_groups]
+        group_results = await asyncio.gather(*tasks)
+        
+        # Step 3: Combine - Merge results from all groups
+        all_articles = []
+        for group_articles in group_results:
+            all_articles.extend(group_articles)
+        
+        # Remove duplicates (by title)
+        unique_titles = set()
+        unique_articles = []
+        for article in all_articles:
+            title = article["title"]
+            if title not in unique_titles:
+                unique_titles.add(title)
+                unique_articles.append(article)
+        
+        # Only keep the most recent articles
+        unique_articles.sort(key=lambda x: x.get("published_date", ""), reverse=True)
+        # Filter out 18+ content
+        safe_articles = [a for a in unique_articles if is_safe_article(a)]
+        top_articles = safe_articles[:min(limit, len(safe_articles))]
+
+        # Perform sentiment analysis using Gemini
+        async def analyze_sentiment(article):
+            try:
+                # Combine title and summary for analysis
+                content = f"{article['title']}. {article['summary']}"
+                prompt = f"""Analyze the sentiment of this news article text. \
+                Respond with a JSON object containing:\n1. score (float between -1 and 1, where -1 is very negative, 0 is neutral, 1 is very positive)\n2. magnitude (float between 0 and 1 indicating strength of sentiment)\n3. label (one of: 'positive', 'negative', 'neutral', 'mixed')\n\nNews text: \"{content}\"\n\nJSON response:"""
+                response = model.generate_content(prompt)
+                try:
+                    sentiment_data = json.loads(response.text)
+                    article
+                    article["sentiment"] = sentiment_data
+                except Exception as e:
+                    print(f"Error parsing sentiment JSON: {e}")
+
+            except Exception as e:
+                print(f"Error analyzing sentiment: {e}")
+
+        # Analyze sentiment for each article concurrently
+        sentiment_tasks = [analyze_sentiment(article) for article in top_articles]
+        await asyncio.gather(*sentiment_tasks)
+
+        # Cache the trending news
+        NEWS_CACHE[cache_key] = {
+            "timestamp": current_time,
+            "data": top_articles
+        }
+
+        return top_articles
+
+    except Exception as e:
+        print(f"Error in get_trending_news: {e}")
+        return HTTPException(status_code=500, detail="Internal Server Error")
+
+BANNED_KEYWORDS = [
+    "porn", "sex", "xxx", "escort", "nude", "adult", "nsfw", "camgirl", "cam boy", "onlyfans", "fetish", "erotic", "strip", "prostitute", "prostitution", "naked", "blowjob", "handjob", "orgy", "incest", "bdsm", "anal", "dildo", "masturbat", "hentai", "milf", "cum", "pussy", "cock", "dick", "boobs", "tits", "vagina", "penis", "shemale", "gay sex", "lesbian sex", "gayporn", "lesbianporn", "rape", "molest", "child porn", "child abuse", "bestiality", "zoophilia", "onlygayvideo", "gayvideo", "gaypornvideo", "gayvideo.com", "onlygayvideo.com"
+]
+
+def is_safe_article(article):
+    text = f"{article.get('title', '')} {article.get('summary', '')} {article.get('source', {}).get('name', '')}".lower()
+    link = article.get('link', '').lower()
+    # Extract domain from link
+    domain = tldextract.extract(link).domain if link else ''
+    # Check for banned keywords in text, link, or domain
+    if any(bad in text for bad in BANNED_KEYWORDS):
+        return False
+    if any(bad in link for bad in BANNED_KEYWORDS):
+        return False
+    if any(bad in domain for bad in BANNED_KEYWORDS):
+        return False
+    return True
+repr("")
