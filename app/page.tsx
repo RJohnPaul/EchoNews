@@ -692,9 +692,14 @@ export default function NewsQueryPage() {
       
       // Server responded successfully, so it's not warming up anymore
       setIsServerWarming(false);
-      
-      // Update state with API response
-      setArticles(data.articles);
+
+      // Sort articles by published_date (newest first) before setting state
+      const sortedArticles = [...data.articles].sort((a, b) => 
+        new Date(b.published_date).getTime() - new Date(a.published_date).getTime()
+      );
+
+      // Update state with sorted API response
+      setArticles(sortedArticles);
       setMessage(data.message);
       setTotalFound(data.total_found);
       setTotalPages(data.total_pages);
@@ -752,7 +757,13 @@ export default function NewsQueryPage() {
       
       // Server responded successfully
       setIsServerWarming(false);
-      setTrendingArticles(data.articles);
+
+      // Sort trending articles by published_date (newest first)
+      const sortedTrendingArticles = [...data.articles].sort((a, b) => 
+        new Date(b.published_date).getTime() - new Date(a.published_date).getTime()
+      );
+
+      setTrendingArticles(sortedTrendingArticles);
       
     } catch (err) {
       console.error("Error fetching trending news:", err);
