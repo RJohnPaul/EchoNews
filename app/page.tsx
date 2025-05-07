@@ -692,9 +692,14 @@ export default function NewsQueryPage() {
       
       // Server responded successfully, so it's not warming up anymore
       setIsServerWarming(false);
-      
-      // Update state with API response
-      setArticles(data.articles);
+
+      // Sort articles by published_date (newest first) before setting state
+      const sortedArticles = [...data.articles].sort((a, b) => 
+        new Date(b.published_date).getTime() - new Date(a.published_date).getTime()
+      );
+
+      // Update state with sorted API response
+      setArticles(sortedArticles);
       setMessage(data.message);
       setTotalFound(data.total_found);
       setTotalPages(data.total_pages);
@@ -752,7 +757,13 @@ export default function NewsQueryPage() {
       
       // Server responded successfully
       setIsServerWarming(false);
-      setTrendingArticles(data.articles);
+
+      // Sort trending articles by published_date (newest first)
+      const sortedTrendingArticles = [...data.articles].sort((a, b) => 
+        new Date(b.published_date).getTime() - new Date(a.published_date).getTime()
+      );
+
+      setTrendingArticles(sortedTrendingArticles);
       
     } catch (err) {
       console.error("Error fetching trending news:", err);
@@ -1066,86 +1077,89 @@ export default function NewsQueryPage() {
           onRetry={handleRetry} 
         />
         
-        {/* Trending News Today Section */}
-        <div className="mb-10 pb-8 border-b">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 text-transparent bg-clip-text">
-              Trending News Today
-            </h2>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={fetchTrendingNews}
-              disabled={trendingLoading}
-            >
-              {trendingLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              <span className="ml-2">Refresh</span>
-            </Button>
-          </div>
-          
-          {trendingError && !isServerWarming && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertTitle>Error loading trending news</AlertTitle>
-              <AlertDescription>{trendingError}</AlertDescription>
-            </Alert>
-          )}
-          
-          {trendingLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
-                  <div className="flex flex-col h-full">
-                    <Skeleton className="h-48 w-full" />
-                    <CardHeader className="pb-2">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-6 w-full mt-2" />
-                      <Skeleton className="h-4 w-28 mt-1" />
-                    </CardHeader>
-                    <CardContent className="pb-2">
-                      <Skeleton className="h-4 w-full mb-2" />
-                      <Skeleton className="h-4 w-3/4" />
-                    </CardContent>
-                    <CardFooter className="pt-2">
-                      <Skeleton className="h-9 w-full" />
-                    </CardFooter>
-                  </div>
-                </Card>
-              ))}
+        {/* Trending News Today Section - Only show when there are no search results */}
+        {articles.length === 0 && (
+          <div className="mb-10 pb-8 border-b">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 text-transparent bg-clip-text">
+                Trending News Today
+              </h2>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchTrendingNews}
+                disabled={trendingLoading}
+              >
+                {trendingLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="ml-2">Refresh</span>
+              </Button>
             </div>
-          ) : (
-            <>
-              {trendingArticles.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <AnimatePresence>
-                    {trendingArticles.map((article) => (
-                      <TrendingNewsCard key={article.id} article={article} />
-                    ))}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-xl font-medium mb-2">No trending articles available</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Try changing language or refreshing in a moment
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    onClick={fetchTrendingNews} 
-                    className="mx-auto"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+            
+            {/* Rest of the trending news section... */}
+            {trendingError && !isServerWarming && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertTitle>Error loading trending news</AlertTitle>
+                <AlertDescription>{trendingError}</AlertDescription>
+              </Alert>
+            )}
+            
+            {trendingLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={i} className="overflow-hidden">
+                    <div className="flex flex-col h-full">
+                      <Skeleton className="h-48 w-full" />
+                      <CardHeader className="pb-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-6 w-full mt-2" />
+                        <Skeleton className="h-4 w-28 mt-1" />
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <Skeleton className="h-4 w-full mb-2" />
+                        <Skeleton className="h-4 w-3/4" />
+                      </CardContent>
+                      <CardFooter className="pt-2">
+                        <Skeleton className="h-9 w-full" />
+                      </CardFooter>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <>
+                {trendingArticles.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <AnimatePresence>
+                      {trendingArticles.map((article, index) => (
+                        <TrendingNewsCard key={`${article.id}-${index}`} article={article} />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-medium mb-2">No trending articles available</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Try changing language or refreshing in a moment
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      onClick={fetchTrendingNews} 
+                      className="mx-auto"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
         
         {/* Category filter chips */}
         <div className="mt-2 mb-6">
@@ -1268,8 +1282,8 @@ export default function NewsQueryPage() {
         {!loading && articles.length > 0 && (
           <div className="space-y-6">
             <AnimatePresence>
-              {articles.map((article) => (
-                <ArticleCard key={article.id} article={article} />
+              {articles.map((article, index) => (
+                <ArticleCard key={`${article.id}-${index}`} article={article} />
               ))}
             </AnimatePresence>
             

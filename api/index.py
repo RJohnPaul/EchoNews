@@ -16,12 +16,12 @@ import asyncio
 import tldextract
 
 import google.generativeai as genai
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDOrCItR_V5KP0oD0jP1OMmTNrnS4Oe2_k")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDZs7YPjphmwdIVSJYkbrRHVuzWqAQ8MDs")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # NewsAPI fallback
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "geyhAiJcUMZJc5qJjYw_3-aQbLIV24A1QKpBE1QnDvE1AwHI")  # Updated NewsAPI key
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "e177d7f915a24974bc1cd0832a51b9c1")  # Updated NewsAPI key
 
 # Set default socket timeout for all connections
 socket.setdefaulttimeout(5.0)  # Reduce timeout from 15s to 5s
