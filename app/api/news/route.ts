@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Increased timeout for better reliability
-const BASE_URL = "https://newsai-swc7.onrender.com";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com";
 const TIMEOUT_DURATION = 90000; // Extended to 90 seconds for better reliability
 
 export async function POST(request: Request) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Increased timeout for reliability
-const BASE_URL = "https://newsai-swc7.onrender.com";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com";
 const TIMEOUT_DURATION = 60000; // 60 seconds timeout
 
 export async function GET(request: Request, { params }: { params: { language: string } }) {
@@ -9,7 +9,7 @@ export async function GET(request: Request, { params }: { params: { language: st
     // Get language from route parameters
     const language = params.language;
     
-    console.log(`Fetching news sources for language: ${language}`);
+    console.log(`Fetching news sources for language: ${language}`, `Using API URL: ${BASE_URL}`);
     
     // Create AbortController for timeout handling
     const controller = new AbortController();
@@ -31,6 +31,13 @@ export async function GET(request: Request, { params }: { params: { language: st
     }
 
     const data = await response.json();
+    
+    // Ensure we return data in the expected format
+    if (!data.sources && Array.isArray(data)) {
+      // If the backend returns just an array of sources instead of an object with sources property
+      return NextResponse.json({ sources: data });
+    }
+    
     return NextResponse.json(data);
   } catch (error: any) {
     console.error(`Error fetching news sources for language: ${params.language}`, error);
@@ -40,7 +47,7 @@ export async function GET(request: Request, { params }: { params: { language: st
       return NextResponse.json(
         { 
           error: 'Request timed out. The backend server might be starting up after inactivity. Please try again.',
-          sources: []
+          sources: getFallbackSources(params.language)
         },
         { status: 504 }
       );
@@ -49,22 +56,12 @@ export async function GET(request: Request, { params }: { params: { language: st
     // Provide fallback sources for common languages
     const fallbackSources = getFallbackSources(params.language);
     
-    if (fallbackSources.length > 0) {
-      return NextResponse.json(
-        { 
-          message: "Using fallback sources due to API error",
-          sources: fallbackSources
-        },
-        { status: 200 }
-      );
-    }
-    
     return NextResponse.json(
       { 
-        error: 'Failed to fetch news sources',
-        sources: []
+        message: "Using fallback sources due to API error",
+        sources: fallbackSources
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

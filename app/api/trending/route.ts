@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 
+// Use environment variable for backend URL
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://newsai-swc7.onrender.com";
+
 // Trending topics for our fallback generator
 const TRENDING_TOPICS = [
   "technology", "ai", "business", "climate", "health", 
@@ -31,8 +34,7 @@ export async function GET(request: Request) {
 
     // Try to fetch trending news from backend FastAPI first
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://newsai-swc7.onrender.com';
-      const response = await fetch(`${backendUrl}/api/trending?language=${language}&limit=${limit}`, {
+      const response = await fetch(`${BASE_URL}/api/trending?language=${language}&limit=${limit}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
